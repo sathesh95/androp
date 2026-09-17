@@ -385,17 +385,19 @@ object NetworkManager {
         }
 
         val jsonString = json.toString()
+        val payloadBytes = (jsonString + "\n").toByteArray(Charsets.UTF_8)
 
-        // 1. Send via Cloudflare WebSocket
+        // 1. Send via Cloudflare WebSocket (if connected)
         webSocket?.send(jsonString)
 
-        // 2. Send via Direct LAN Sockets
+        // 2. Send via Direct LAN Sockets (Immediate byte write + flush)
         networkExecutor.execute {
             synchronized(lanSockets) {
                 for (socket in lanSockets) {
                     try {
-                        val writer = PrintWriter(socket.getOutputStream(), true)
-                        writer.println(jsonString)
+                        val outputStream = socket.getOutputStream()
+                        outputStream.write(payloadBytes)
+                        outputStream.flush()
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }

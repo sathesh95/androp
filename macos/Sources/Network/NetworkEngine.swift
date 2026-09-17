@@ -158,6 +158,7 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
             
             do {
                 let (decryptedText, decryptedHash) = try CryptoEngine.shared.decrypt(ciphertextBase64: ciphertext, ivBase64: iv)
+                print("[NetworkEngine] Successfully decrypted payload from Android: '\(decryptedText.prefix(30))...'")
                 ClipboardWatcher.shared.writeToPasteboard(text: decryptedText, hash: decryptedHash)
                 DispatchQueue.main.async {
                     self.delegate?.receivedNewClipboardText(decryptedText)
@@ -320,8 +321,24 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
     }
     
     private func handleNewLanConnection(_ connection: NWConnection) {
+        connection.stateUpdateHandler = { [weak self] state in
+            guard let self = self else { return }
+            switch state {
+            case .ready:
+                print("[NetworkEngine] Incoming Android LAN connection established and ready!")
+                self.status = .lanConnected
+            case .failed, .cancelled:
+                self.activeLanConnections.removeAll(where: { $0 === connection })
+                if self.activeLanConnections.isEmpty && self.status == .lanConnected {
+                    self.status = .disconnected
+                }
+            default:
+                break
+            }
+        }
         connection.start(queue: .global())
         activeLanConnections.append(connection)
+        self.status = .lanConnected
         
         self.receiveLanData(from: connection)
     }
