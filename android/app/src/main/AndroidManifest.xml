@@ -43,12 +43,18 @@
             android:exported="false"
             android:screenOrientation="portrait" />
 
+        <!-- Ghost Activity for Background Clipboard Access -->
+        <!-- taskAffinity="" isolates this in its own task so it NEVER brings MainActivity to the front -->
         <activity
             android:name=".ui.ClipboardGhostActivity"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:theme="@style/Theme.Transparent.NoAnimation"
             android:excludeFromRecents="true"
-            android:exported="false"
-            android:noHistory="true" />
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:showWhenLocked="true"
+            android:turnScreenOn="false"
+            android:windowSoftInputMode="stateUnchanged"
+            android:exported="false" />
 
         <!-- Accessibility Service: Intercepts background copy events across all apps -->
         <service

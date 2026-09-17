@@ -152,7 +152,8 @@ class ClipboardGhostActivity : Activity() {
         if (!hasFinished) {
             hasFinished = true
             safetyHandler.removeCallbacks(safetyTimeout)
-            finish()
+            finishAndRemoveTask()
+            disableCloseAnimation()
         }
     }
 
