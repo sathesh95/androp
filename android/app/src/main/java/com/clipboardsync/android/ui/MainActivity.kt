@@ -56,7 +56,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnTestSync.setOnClickListener {
             val sampleText = "Hello from Android! (Sent at ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())})"
-            ClipboardAccessibilityService.setClipboardContent(this, sampleText)
+            com.clipboardsync.android.ui.ClipboardGhostActivity.copyToClipboard(this, sampleText)
             NetworkManager.broadcastClipboard(sampleText)
             Toast.makeText(this, "Sent test text to Mac!", Toast.LENGTH_SHORT).show()
         }

@@ -44,7 +44,7 @@
             android:screenOrientation="portrait" />
 
         <activity
-            android:name=".ui.ClipboardCaptureActivity"
+            android:name=".ui.ClipboardGhostActivity"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"
             android:exported="false"
