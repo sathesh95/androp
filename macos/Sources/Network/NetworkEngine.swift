@@ -11,6 +11,7 @@ public enum ConnectionStatus: String {
 public protocol NetworkEngineDelegate: AnyObject {
     func connectionStatusDidChange(_ status: ConnectionStatus)
     func receivedNewClipboardText(_ text: String)
+    func receivedNewOTP(code: String, sender: String, originalText: String)
 }
 
 public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
@@ -166,6 +167,37 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
                 }
             } catch {
                 print("[NetworkEngine] Decryption failed: \(error)")
+            }
+        }
+        
+        if type == "OTP" {
+            guard let ciphertext = json["ciphertext"] as? String,
+                  let iv = json["iv"] as? String else { return }
+            
+            let originDeviceId = json["originDeviceId"] as? String ?? ""
+            if originDeviceId == self.deviceId {
+                return
+            }
+            
+            do {
+                let (decryptedJsonString, _) = try CryptoEngine.shared.decrypt(ciphertextBase64: ciphertext, ivBase64: iv)
+                guard let otpData = decryptedJsonString.data(using: .utf8),
+                      let otpJson = try? JSONSerialization.jsonObject(with: otpData) as? [String: Any],
+                      let code = otpJson["code"] as? String else { return }
+                
+                let sender = otpJson["sender"] as? String ?? "SMS"
+                let originalText = otpJson["originalText"] as? String ?? ""
+                
+                print("[NetworkEngine] Received encrypted OTP from Android: \(code) (Sender: \(sender))")
+                
+                // Route to OTPManager
+                OTPManager.shared.handleReceivedOTP(code: code, sender: sender, originalText: originalText)
+                
+                DispatchQueue.main.async {
+                    self.delegate?.receivedNewOTP(code: code, sender: sender, originalText: originalText)
+                }
+            } catch {
+                print("[NetworkEngine] OTP decryption failed: \(error)")
             }
         }
     }

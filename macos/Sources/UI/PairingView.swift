@@ -2,6 +2,7 @@ import SwiftUI
 import CoreImage.CIFilterBuiltins
 
 public struct PairingView: View {
+    @ObservedObject private var otpManager = OTPManager.shared
     @State private var connectionStatus: ConnectionStatus = NetworkEngine.shared.status
     @State private var pairingPayload: String = CryptoEngine.shared.getPairingPayload()
     @State private var relayUrl: String = CryptoEngine.shared.relayUrl
@@ -10,11 +11,12 @@ public struct PairingView: View {
     @State private var showSettings: Bool = false
     @State private var lastSyncedText: String = ""
     @State private var copyNotice: Bool = false
+    @State private var otpCopiedNotice: Bool = false
 
     public init() {}
 
     public var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             // Header with Status Indicator
             HStack {
                 Circle()
@@ -30,6 +32,11 @@ public struct PairingView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 4)
+
+            // Active OTP Section (if active)
+            if let otp = otpManager.currentOTP, !otp.isExpired {
+                otpCard(otp: otp)
+            }
 
             Divider()
 
@@ -202,5 +209,57 @@ public struct PairingView: View {
             return NSImage(cgImage: cgImage, size: NSSize(width: 180, height: 180))
         }
         return nil
+    }
+
+    private func otpCard(otp: OTPRecord) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Image(systemName: "key.fill")
+                    .foregroundColor(.yellow)
+                    .font(.system(size: 12))
+                Text("OTP RECEIVED")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("⏳ \(otp.timeRemainingFormatted)")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+
+            HStack {
+                Text(otp.code)
+                    .font(.system(size: 22, weight: .bold, design: .monospaced))
+                    .foregroundColor(.primary)
+                Spacer()
+                Button(action: {
+                    otpManager.copyOtpToClipboard(otp)
+                    otpCopiedNotice = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        otpCopiedNotice = false
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: otpCopiedNotice ? "checkmark" : "doc.on.doc")
+                        Text(otpCopiedNotice ? "Copied" : "Copy")
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                }
+                .buttonStyle(.borderedProminent)
+            }
+
+            if !otp.sender.isEmpty {
+                Text("From: \(otp.sender)")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(10)
+        .background(Color.yellow.opacity(0.12))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.yellow.opacity(0.35), lineWidth: 1)
+        )
     }
 }

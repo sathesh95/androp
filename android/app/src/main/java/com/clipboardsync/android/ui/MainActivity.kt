@@ -34,6 +34,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val smsPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+        val receiveGranted = permissions[android.Manifest.permission.RECEIVE_SMS] == true
+        val readGranted = permissions[android.Manifest.permission.READ_SMS] == true
+        if (receiveGranted && readGranted) {
+            Toast.makeText(this, "SMS OTP Auto-Detection enabled!", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "SMS permissions needed for OTP detection", Toast.LENGTH_SHORT).show()
+        }
+        updateUI()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -70,6 +81,20 @@ class MainActivity : AppCompatActivity() {
             requestBatteryOptimizationExemption()
         }
 
+        binding.btnEnableSmsOtp.setOnClickListener {
+            if (!isSmsPermissionGranted()) {
+                smsPermissionLauncher.launch(arrayOf(
+                    android.Manifest.permission.RECEIVE_SMS,
+                    android.Manifest.permission.READ_SMS
+                ))
+            } else {
+                val current = CryptoManager.isOtpSyncEnabled()
+                CryptoManager.setOtpSyncEnabled(!current)
+                updateUI()
+                Toast.makeText(this, if (!current) "OTP sync enabled" else "OTP sync paused", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         binding.btnUnpair.setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("Unpair Device")
@@ -97,6 +122,8 @@ class MainActivity : AppCompatActivity() {
         val isPaired = CryptoManager.isPaired()
         val isAccessibilityEnabled = isAccessibilityServiceEnabled()
         val isBatteryIgnored = isBatteryOptimizationIgnored()
+        val isSmsGranted = isSmsPermissionGranted()
+        val isOtpSyncEnabled = CryptoManager.isOtpSyncEnabled()
 
         if (!isPaired) {
             binding.tvStatusText.text = "Not Paired"
@@ -115,6 +142,18 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnIgnoreBattery.text = if (isBatteryIgnored) "Whitelisted ✓" else "Whitelist"
         binding.btnIgnoreBattery.isEnabled = !isBatteryIgnored
+
+        if (!isSmsGranted) {
+            binding.btnEnableSmsOtp.text = "Enable"
+        } else {
+            binding.btnEnableSmsOtp.text = if (isOtpSyncEnabled) "Enabled ✓" else "Paused"
+        }
+    }
+
+    private fun isSmsPermissionGranted(): Boolean {
+        val receiveGranted = ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECEIVE_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val readGranted = ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        return receiveGranted && readGranted
     }
 
     private fun updateConnectionStatus(status: ConnectionStatus) {

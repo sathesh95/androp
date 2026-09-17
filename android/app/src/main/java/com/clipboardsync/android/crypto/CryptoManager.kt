@@ -16,10 +16,19 @@ object CryptoManager {
     private const val KEY_ROOM_ID = "room_id"
     private const val KEY_AES_KEY = "aes_key"
     private const val KEY_RELAY_URL = "relay_url"
+    private const val KEY_OTP_SYNC = "otp_sync_enabled"
     private const val DEFAULT_RELAY = "wss://clipboard-sync-relay.your-subdomain.workers.dev/ws"
 
     private lateinit var prefs: SharedPreferences
     private var secretKey: SecretKey? = null
+
+    fun isOtpSyncEnabled(): Boolean {
+        return prefs.getBoolean(KEY_OTP_SYNC, true)
+    }
+
+    fun setOtpSyncEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_OTP_SYNC, enabled).apply()
+    }
 
     fun init(context: Context) {
         try {

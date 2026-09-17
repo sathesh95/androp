@@ -415,4 +415,49 @@ object NetworkManager {
             }
         }
     }
+
+    fun broadcastOtp(code: String, sender: String, originalText: String) {
+        val payloadJson = JSONObject().apply {
+            put("code", code)
+            put("sender", sender)
+            put("originalText", originalText)
+            put("timestamp", System.currentTimeMillis())
+        }
+        val encrypted = CryptoManager.encrypt(payloadJson.toString()) ?: return
+        val (ciphertext, iv, hash) = encrypted
+        val roomId = CryptoManager.getRoomId() ?: return
+
+        HashUtil.markHashAsHandled(hash)
+
+        val json = JSONObject().apply {
+            put("type", "OTP")
+            put("roomId", roomId)
+            put("ciphertext", ciphertext)
+            put("iv", iv)
+            put("hash", hash)
+            put("originDeviceId", deviceId)
+            put("timestamp", System.currentTimeMillis())
+        }
+
+        val jsonString = json.toString()
+        val payloadBytes = (jsonString + "\n").toByteArray(Charsets.UTF_8)
+
+        // 1. Send via Cloudflare WebSocket
+        webSocket?.send(jsonString)
+
+        // 2. Send via Direct LAN Sockets
+        networkExecutor.execute {
+            synchronized(lanSockets) {
+                for (socket in lanSockets) {
+                    try {
+                        val outputStream = socket.getOutputStream()
+                        outputStream.write(payloadBytes)
+                        outputStream.flush()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+    }
 }

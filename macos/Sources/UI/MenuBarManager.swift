@@ -67,11 +67,26 @@ public final class MenuBarManager: NSObject, ClipboardWatcherDelegate, NetworkEn
         animateIconSync()
     }
     
+    public func receivedNewOTP(code: String, sender: String, originalText: String) {
+        print("[MenuBarManager] Synced new remote OTP: \(code)")
+        animateIconOTP()
+    }
+    
     private func animateIconSync() {
         DispatchQueue.main.async { [weak self] in
             guard let button = self?.statusItem?.button else { return }
             button.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Synced")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                button.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath.doc.on.clipboard", accessibilityDescription: "Clipboard Sync")
+            }
+        }
+    }
+    
+    private func animateIconOTP() {
+        DispatchQueue.main.async { [weak self] in
+            guard let button = self?.statusItem?.button else { return }
+            button.image = NSImage(systemSymbolName: "key.fill", accessibilityDescription: "OTP Received")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 button.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath.doc.on.clipboard", accessibilityDescription: "Clipboard Sync")
             }
         }
