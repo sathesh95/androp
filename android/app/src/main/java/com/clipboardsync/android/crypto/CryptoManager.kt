@@ -64,16 +64,33 @@ object CryptoManager {
     }
 
     fun updateRelayUrl(newUrl: String) {
-        prefs.edit().putString(KEY_RELAY_URL, newUrl).apply()
+        val sanitized = sanitizeRelayUrl(newUrl)
+        prefs.edit().putString(KEY_RELAY_URL, sanitized).apply()
     }
 
     fun savePairingCredentials(roomId: String, keyBase64: String, relayUrl: String?) {
+        val sanitizedRelay = sanitizeRelayUrl(relayUrl ?: DEFAULT_RELAY)
         prefs.edit()
             .putString(KEY_ROOM_ID, roomId)
             .putString(KEY_AES_KEY, keyBase64)
-            .putString(KEY_RELAY_URL, relayUrl ?: DEFAULT_RELAY)
+            .putString(KEY_RELAY_URL, sanitizedRelay)
             .apply()
         loadKey()
+    }
+
+    private fun sanitizeRelayUrl(url: String): String {
+        var clean = url.trim()
+        if (clean.startsWith("http://")) {
+            clean = "ws://" + clean.substring(7)
+        } else if (clean.startsWith("https://")) {
+            clean = "wss://" + clean.substring(8)
+        } else if (!clean.startsWith("wss://") && !clean.startsWith("ws://")) {
+            clean = "wss://$clean"
+        }
+        if (!clean.endsWith("/ws") && !clean.contains("/ws?")) {
+            clean = clean.trimEnd('/') + "/ws"
+        }
+        return clean
     }
 
     fun clearCredentials() {

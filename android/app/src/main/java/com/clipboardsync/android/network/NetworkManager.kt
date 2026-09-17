@@ -297,7 +297,7 @@ object NetworkManager {
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 handler.post {
-                    if (!isIntentionalClose && lanSockets.isEmpty()) {
+                    if (lanSockets.isEmpty() && !isIntentionalClose) {
                         currentStatus = ConnectionStatus.DISCONNECTED
                         scheduleReconnect()
                     }

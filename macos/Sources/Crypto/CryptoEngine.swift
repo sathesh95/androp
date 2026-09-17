@@ -36,8 +36,19 @@ public final class CryptoEngine {
     }
     
     public func setRelayUrl(_ url: String) {
-        self.relayUrl = url
-        saveToKeychain(account: relayAccount, data: url)
+        var clean = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        if clean.hasPrefix("http://") {
+            clean = "ws://" + clean.dropFirst(7)
+        } else if clean.hasPrefix("https://") {
+            clean = "wss://" + clean.dropFirst(8)
+        } else if !clean.hasPrefix("wss://") && !clean.hasPrefix("ws://") {
+            clean = "wss://" + clean
+        }
+        if !clean.hasSuffix("/ws") && !clean.contains("/ws?") {
+            clean = clean.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/ws"
+        }
+        self.relayUrl = clean
+        saveToKeychain(account: relayAccount, data: clean)
     }
     
     public func getPairingPayload() -> String {

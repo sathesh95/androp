@@ -5,7 +5,7 @@ interface Env {
 }
 
 interface EncryptedPayload {
-  type: "SYNC" | "GET_LATEST" | "LATEST_DATA" | "PING" | "PONG" | "ACK";
+  type: "SYNC" | "OTP" | "GET_LATEST" | "LATEST_DATA" | "PING" | "PONG" | "ACK";
   roomId: string;
   iv?: string;
   ciphertext?: string;
@@ -60,12 +60,11 @@ export class SyncRoom extends DurableObject {
         return;
       }
 
-      if (data.type === "SYNC") {
-        if (!data.ciphertext || !data.iv || !data.hash) return;
+      if (data.type === "SYNC" || data.type === "OTP") {
+        if (!data.ciphertext || !data.iv) return;
 
-        // Store encrypted blob in memory catchup buffer (Max 24 hour freshness)
-        this.lastBuffer = {
-          type: "SYNC",
+        const broadcastPayload: EncryptedPayload = {
+          type: data.type,
           roomId: data.roomId,
           iv: data.iv,
           ciphertext: data.ciphertext,
@@ -74,20 +73,27 @@ export class SyncRoom extends DurableObject {
           timestamp: data.timestamp || Date.now()
         };
 
+        // Only store standard clipboard in catchup buffer (do not persist OTP in catchup)
+        if (data.type === "SYNC") {
+          this.lastBuffer = broadcastPayload;
+        }
+
         // Broadcast to all other connected sockets in this room
         const sockets = this.ctx.getWebSockets();
         for (const targetWs of sockets) {
           if (targetWs !== ws) {
             try {
-              targetWs.send(JSON.stringify(this.lastBuffer));
+              targetWs.send(JSON.stringify(broadcastPayload));
             } catch (err) {
               // Socket might be closing
             }
           }
         }
 
-        // Acknowledge sender
-        ws.send(JSON.stringify({ type: "ACK", hash: data.hash }));
+        // Acknowledge sender if hash exists
+        if (data.hash) {
+          ws.send(JSON.stringify({ type: "ACK", hash: data.hash }));
+        }
       }
     } catch (e) {
       console.error("Invalid message format received", e);
