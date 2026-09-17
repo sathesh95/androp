@@ -50,6 +50,14 @@ object CryptoManager {
         return prefs.getString(KEY_RELAY_URL, DEFAULT_RELAY) ?: DEFAULT_RELAY
     }
 
+    fun getKeyBase64(): String? {
+        return prefs.getString(KEY_AES_KEY, null)
+    }
+
+    fun updateRelayUrl(newUrl: String) {
+        prefs.edit().putString(KEY_RELAY_URL, newUrl).apply()
+    }
+
     fun savePairingCredentials(roomId: String, keyBase64: String, relayUrl: String?) {
         prefs.edit()
             .putString(KEY_ROOM_ID, roomId)

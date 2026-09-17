@@ -205,6 +205,20 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
         }
     }
     
+    public func broadcastConfigUpdate(newRelayUrl: String) {
+        guard let roomId = CryptoEngine.shared.roomId else { return }
+        let payload: [String: Any] = [
+            "type": "CONFIG_UPDATE",
+            "roomId": roomId,
+            "relayUrl": newRelayUrl,
+            "originDeviceId": deviceId
+        ]
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: payload),
+              let jsonString = String(data: jsonData, encoding: .utf8) else { return }
+        
+        broadcastOverLan(jsonString: jsonString)
+    }
+    
     private func handleDisconnect() {
         if isIntentionalDisconnect { return }
         self.status = .disconnected

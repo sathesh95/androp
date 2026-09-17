@@ -156,6 +156,7 @@ public struct PairingView: View {
                 Button("Save & Reconnect") {
                     CryptoEngine.shared.setRelayUrl(relayUrl)
                     pairingPayload = CryptoEngine.shared.getPairingPayload()
+                    NetworkEngine.shared.broadcastConfigUpdate(newRelayUrl: relayUrl)
                     NetworkEngine.shared.reloadConfiguration()
                 }
                 .font(.system(size: 11))

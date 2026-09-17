@@ -337,6 +337,16 @@ object NetworkManager {
             val json = JSONObject(text)
             val type = json.optString("type")
 
+            if (type == "CONFIG_UPDATE") {
+                val newRelayUrl = json.optString("relayUrl")
+                if (newRelayUrl.isNotEmpty() && !newRelayUrl.contains("your-subdomain")) {
+                    android.util.Log.d("NetworkManager", "Received updated Cloudflare relay URL: $newRelayUrl")
+                    CryptoManager.updateRelayUrl(newRelayUrl)
+                    restart()
+                }
+                return
+            }
+
             if (type == "SYNC" || type == "LATEST_DATA") {
                 val originDeviceId = json.optString("originDeviceId")
                 if (originDeviceId == deviceId) {
