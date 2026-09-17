@@ -1,0 +1,35 @@
+package com.clipboardsync.android
+
+import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
+import com.clipboardsync.android.crypto.CryptoManager
+
+class ClipboardSyncApp : Application() {
+
+    companion object {
+        const val CHANNEL_ID = "clipboard_sync_channel"
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        CryptoManager.init(this)
+        createNotificationChannel()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Clipboard Sync Service",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Keeps clipboard synchronization active in the background"
+                setShowBadge(false)
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.createNotificationChannel(channel)
+        }
+    }
+}

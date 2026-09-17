@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+.cache/
+macos/.build/
+macos/build/
+
+# Node / Cloudflare
+node_modules/
+relay/.wrangler/
+
+# Android / Gradle
+.gradle/
+build/
+android/app/build/
+android/.gradle/
+local.properties
+*.iml
+.idea/

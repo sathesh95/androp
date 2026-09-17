@@ -1,0 +1,17 @@
+{
+  "name": "clipboard-sync-relay",
+  "version": "1.0.0",
+  "description": "Zero-knowledge end-to-end encrypted clipboard sync relay on Cloudflare Workers",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240909.0",
+    "typescript": "^5.6.2",
+    "wrangler": "^3.78.2"
+  }
+}

@@ -1,0 +1,12 @@
+name = "clipboard-sync-relay"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+
+[durable_objects]
+bindings = [
+  { name = "SYNC_ROOMS", class_name = "SyncRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["SyncRoom"]
