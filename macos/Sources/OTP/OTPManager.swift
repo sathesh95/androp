@@ -38,12 +38,21 @@ public final class OTPManager: NSObject, ObservableObject, UNUserNotificationCen
     
     private var expirationTimer: Timer?
     
+    private var hasBundleIdentifier: Bool {
+        return Bundle.main.bundleIdentifier != nil
+    }
+    
     private override init() {
         super.init()
         setupNotifications()
     }
     
     private func setupNotifications() {
+        guard hasBundleIdentifier else {
+            print("[OTPManager] Running as raw CLI/SPM binary without bundle identifier. System notifications disabled (OTP will still be copied to clipboard & shown in Menu Bar popover). To enable system banners, package with ./macos/build_app.sh.")
+            return
+        }
+        
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
@@ -71,7 +80,7 @@ public final class OTPManager: NSObject, ObservableObject, UNUserNotificationCen
             // 2. Schedule expiration countdown timer
             self.startExpirationTimer()
             
-            // 3. Post macOS system notification banner
+            // 3. Post macOS system notification banner (if bundle exists)
             self.postSystemNotification(record: record)
         }
     }
@@ -93,6 +102,8 @@ public final class OTPManager: NSObject, ObservableObject, UNUserNotificationCen
     }
     
     private func postSystemNotification(record: OTPRecord) {
+        guard hasBundleIdentifier else { return }
+        
         let content = UNMutableNotificationContent()
         content.title = "🔑 Verification Code: \(record.code)"
         content.subtitle = "From: \(record.sender)"
