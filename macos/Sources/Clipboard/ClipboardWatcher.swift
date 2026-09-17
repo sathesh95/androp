@@ -14,11 +14,11 @@ public final class ClipboardWatcher {
     private var lastChangeCount: Int = 0
     private var timer: Timer?
     
-    // Ring buffer of known hashes (both sent and received) to prevent echo loops
+    // Ring buffer of known hashes protected by a dedicated serial queue
     private var knownHashes: Set<String> = []
     private var hashHistory: [String] = []
     private let maxHistorySize = 100
-    private let lock = NSLock()
+    private let hashQueue = DispatchQueue(label: "com.clipboardsync.hashQueue")
     
     // Filter out password manager copy types
     private let concealedPasteboardTypes: [NSPasteboard.PasteboardType] = [
@@ -51,21 +51,20 @@ public final class ClipboardWatcher {
     }
     
     public func markHashAsHandled(_ hash: String) {
-        lock.lock()
-        defer { lock.unlock() }
-        
-        knownHashes.insert(hash)
-        hashHistory.append(hash)
-        if hashHistory.count > maxHistorySize {
-            let removed = hashHistory.removeFirst()
-            knownHashes.remove(removed)
+        hashQueue.sync {
+            knownHashes.insert(hash)
+            hashHistory.append(hash)
+            if hashHistory.count > maxHistorySize {
+                let removed = hashHistory.removeFirst()
+                knownHashes.remove(removed)
+            }
         }
     }
     
     public func isHashKnown(_ hash: String) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return knownHashes.contains(hash)
+        return hashQueue.sync {
+            knownHashes.contains(hash)
+        }
     }
     
     public func writeToPasteboard(text: String, hash: String) {

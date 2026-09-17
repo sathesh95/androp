@@ -33,7 +33,8 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
     private var reconnectTimer: Timer?
     private var isIntentionalDisconnect = false
     
-    // Bonjour LAN properties
+    // Thread-safe serial queue for LAN network operations
+    private let lanQueue = DispatchQueue(label: "com.clipboardsync.lanQueue")
     private var nwListener: NWListener?
     private var nwBrowser: NWBrowser?
     private var activeLanConnections: [NWConnection] = []
@@ -258,19 +259,21 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
                 self?.handleNewLanConnection(newConnection)
             }
             
-            nwListener?.start(queue: .global())
+            nwListener?.start(queue: lanQueue)
         } catch {
             print("[NetworkEngine] Failed to start Bonjour listener: \(error)")
         }
     }
     
     private func stopLanListener() {
-        nwListener?.cancel()
-        nwListener = nil
-        for conn in activeLanConnections {
-            conn.cancel()
+        lanQueue.sync {
+            nwListener?.cancel()
+            nwListener = nil
+            for conn in activeLanConnections {
+                conn.cancel()
+            }
+            activeLanConnections.removeAll()
         }
-        activeLanConnections.removeAll()
     }
     
     private func startLanBrowser() {
@@ -280,7 +283,6 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
         nwBrowser?.browseResultsChangedHandler = { [weak self] results, changes in
             guard let self = self else { return }
             for result in results {
-                // If it is another device (not ourselves)
                 if case .service(let name, _, _, _) = result.endpoint {
                     if !name.contains(self.deviceId) {
                         self.connectToLanPeer(endpoint: result.endpoint)
@@ -289,16 +291,17 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
             }
         }
         
-        nwBrowser?.start(queue: .global())
+        nwBrowser?.start(queue: lanQueue)
     }
     
     private func stopLanBrowser() {
-        nwBrowser?.cancel()
-        nwBrowser = nil
+        lanQueue.sync {
+            nwBrowser?.cancel()
+            nwBrowser = nil
+        }
     }
     
     private func connectToLanPeer(endpoint: NWEndpoint) {
-        // Avoid duplicate connections to the same endpoint
         let connection = NWConnection(to: endpoint, using: .tcp)
         connection.stateUpdateHandler = { [weak self] state in
             guard let self = self else { return }
@@ -308,16 +311,20 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
                 self.status = .lanConnected
                 self.receiveLanData(from: connection)
             case .failed, .cancelled:
-                self.activeLanConnections.removeAll(where: { $0 === connection })
-                if self.activeLanConnections.isEmpty && self.status == .lanConnected {
-                    self.status = .disconnected
+                self.lanQueue.async {
+                    self.activeLanConnections.removeAll(where: { $0 === connection })
+                    if self.activeLanConnections.isEmpty && self.status == .lanConnected {
+                        self.status = .disconnected
+                    }
                 }
             default:
                 break
             }
         }
-        connection.start(queue: .global())
-        activeLanConnections.append(connection)
+        connection.start(queue: lanQueue)
+        lanQueue.async {
+            self.activeLanConnections.append(connection)
+        }
     }
     
     private func handleNewLanConnection(_ connection: NWConnection) {
@@ -328,17 +335,21 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
                 print("[NetworkEngine] Incoming Android LAN connection established and ready!")
                 self.status = .lanConnected
             case .failed, .cancelled:
-                self.activeLanConnections.removeAll(where: { $0 === connection })
-                if self.activeLanConnections.isEmpty && self.status == .lanConnected {
-                    self.status = .disconnected
+                self.lanQueue.async {
+                    self.activeLanConnections.removeAll(where: { $0 === connection })
+                    if self.activeLanConnections.isEmpty && self.status == .lanConnected {
+                        self.status = .disconnected
+                    }
                 }
             default:
                 break
             }
         }
-        connection.start(queue: .global())
-        activeLanConnections.append(connection)
-        self.status = .lanConnected
+        connection.start(queue: lanQueue)
+        lanQueue.async {
+            self.activeLanConnections.append(connection)
+            self.status = .lanConnected
+        }
         
         self.receiveLanData(from: connection)
     }
@@ -354,9 +365,11 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
             }
             if isComplete || error != nil {
                 connection.cancel()
-                self.activeLanConnections.removeAll(where: { $0 === connection })
-                if self.activeLanConnections.isEmpty && self.status == .lanConnected {
-                    self.status = .disconnected
+                self.lanQueue.async {
+                    self.activeLanConnections.removeAll(where: { $0 === connection })
+                    if self.activeLanConnections.isEmpty && self.status == .lanConnected {
+                        self.status = .disconnected
+                    }
                 }
             } else {
                 self.receiveLanData(from: connection)
@@ -367,7 +380,9 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
     private func broadcastOverLan(jsonString: String) {
         let framedString = jsonString.hasSuffix("\n") ? jsonString : jsonString + "\n"
         guard let data = framedString.data(using: .utf8) else { return }
-        for conn in activeLanConnections {
+        
+        let targets = lanQueue.sync { self.activeLanConnections }
+        for conn in targets {
             conn.send(content: data, completion: .contentProcessed({ _ in }))
         }
     }
