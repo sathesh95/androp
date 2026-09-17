@@ -15,6 +15,7 @@ class ClipboardSyncApp : Application() {
     override fun onCreate() {
         super.onCreate()
         CryptoManager.init(this)
+        com.clipboardsync.android.network.NetworkManager.init(this)
         createNotificationChannel()
     }
 

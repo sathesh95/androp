@@ -330,11 +330,17 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] content, _, isComplete, error in
             guard let self = self else { return }
             if let data = content, let text = String(data: data, encoding: .utf8) {
-                self.handleIncomingJSON(text)
+                let lines = text.components(separatedBy: .newlines)
+                for line in lines where !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    self.handleIncomingJSON(line)
+                }
             }
             if isComplete || error != nil {
                 connection.cancel()
                 self.activeLanConnections.removeAll(where: { $0 === connection })
+                if self.activeLanConnections.isEmpty && self.status == .lanConnected {
+                    self.status = .disconnected
+                }
             } else {
                 self.receiveLanData(from: connection)
             }
@@ -342,7 +348,8 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
     }
     
     private func broadcastOverLan(jsonString: String) {
-        guard let data = jsonString.data(using: .utf8) else { return }
+        let framedString = jsonString.hasSuffix("\n") ? jsonString : jsonString + "\n"
+        guard let data = framedString.data(using: .utf8) else { return }
         for conn in activeLanConnections {
             conn.send(content: data, completion: .contentProcessed({ _ in }))
         }
