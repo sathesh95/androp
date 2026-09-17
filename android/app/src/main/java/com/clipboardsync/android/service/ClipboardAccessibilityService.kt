@@ -83,8 +83,8 @@ class ClipboardAccessibilityService : AccessibilityService() {
 
         mainHandler.post {
             try {
-                val clip = clipboardManager?.primaryClip ?: return@post
-                if (clip.itemCount > 0) {
+                val clip = clipboardManager?.primaryClip
+                if (clip != null && clip.itemCount > 0) {
                     val item = clip.getItemAt(0)
                     val text = item.text?.toString() ?: item.coerceToText(this).toString()
                     if (text.isNotEmpty()) {
@@ -94,8 +94,18 @@ class ClipboardAccessibilityService : AccessibilityService() {
                             HashUtil.markHashAsHandled(hash)
                             Log.d(TAG, "New local copy detected on Android: ${text.take(30)}... Broadcasting to Mac!")
                             NetworkManager.broadcastClipboard(text)
+                            return@post
                         }
                     }
+                } else {
+                    // On Android 10+, clipboardManager.primaryClip returns null in background.
+                    // Launch 1-ms transparent trampoline to acquire focus and read clipboard
+                    val captureIntent = android.content.Intent(this, com.clipboardsync.android.ui.ClipboardCaptureActivity::class.java).apply {
+                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                                android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION or
+                                android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    }
+                    startActivity(captureIntent)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error checking clipboard", e)

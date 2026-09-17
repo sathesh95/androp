@@ -54,6 +54,13 @@ class MainActivity : AppCompatActivity() {
             scanQrLauncher.launch(intent)
         }
 
+        binding.btnTestSync.setOnClickListener {
+            val sampleText = "Hello from Android! (Sent at ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())})"
+            ClipboardAccessibilityService.setClipboardContent(this, sampleText)
+            NetworkManager.broadcastClipboard(sampleText)
+            Toast.makeText(this, "Sent test text to Mac!", Toast.LENGTH_SHORT).show()
+        }
+
         binding.btnEnableAccessibility.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             startActivity(intent)
