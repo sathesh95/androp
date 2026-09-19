@@ -38,7 +38,7 @@ object FileTransferManager {
     // Outgoing transfer state
     private var outgoingTransferId: String? = null
     private var outgoingToken: String? = null
-    private var outgoingFileUri: Uri? = null
+    private var outgoingStagedFile: File? = null
     private var outgoingFileName: String? = null
     private var outgoingKeyBytes: ByteArray? = null
 
@@ -50,7 +50,7 @@ object FileTransferManager {
 
     // ── Public API: Send (Android → Mac) ─────────────────────────────────────
 
-    fun sendFile(context: Context, fileUri: Uri, fileName: String) {
+    fun sendFile(context: Context, stagedFile: File, fileName: String, mimeType: String = "application/octet-stream") {
         val roomKey = CryptoManager.getRoomKeyBytes() ?: run {
             Log.w(TAG, "No room key available"); return
         }
@@ -63,17 +63,12 @@ object FileTransferManager {
 
         outgoingTransferId = transferId
         outgoingToken      = token
-        outgoingFileUri    = fileUri
+        outgoingStagedFile = stagedFile
         outgoingFileName   = fileName
         outgoingKeyBytes   = fileKey
 
         val (encKeyB64, keyIvB64) = FileTransferCrypto.encryptFileKey(fileKey, roomKey)
-
-        val fileSize = context.contentResolver.openFileDescriptor(fileUri, "r")?.use {
-            it.statSize
-        } ?: 0L
-
-        val mimeType = context.contentResolver.getType(fileUri) ?: "application/octet-stream"
+        val fileSize = stagedFile.length()
 
         val offer = JSONObject().apply {
             put("type",             "FILE_OFFER")
@@ -193,14 +188,14 @@ object FileTransferManager {
         val tid = json.optString("transferId")
         if (tid != outgoingTransferId) return
 
-        val fileUri  = outgoingFileUri  ?: return
-        val keyBytes = outgoingKeyBytes ?: return
-        val token    = outgoingToken    ?: return
-        val tid2     = outgoingTransferId ?: return
+        val stagedFile = outgoingStagedFile ?: return
+        val keyBytes   = outgoingKeyBytes   ?: return
+        val token      = outgoingToken      ?: return
+        val tid2       = outgoingTransferId ?: return
 
         // Android → Mac always uses R2 (LAN server from Android not yet implemented)
         executor.submit {
-            uploadToR2(context, fileUri, keyBytes, token, tid2)
+            uploadToR2(context, stagedFile, keyBytes, token, tid2)
         }
     }
 
@@ -209,19 +204,13 @@ object FileTransferManager {
         onStatusChange?.invoke("Transfer declined.")
     }
 
-    private fun uploadToR2(context: Context, fileUri: Uri, keyBytes: ByteArray, token: String, transferId: String) {
+    private fun uploadToR2(context: Context, stagedFile: File, keyBytes: ByteArray, token: String, transferId: String) {
         val roomId = CryptoManager.getRoomId() ?: return
         onStatusChange?.invoke("Encrypting file…")
 
-        // Copy URI content to a temp file (needed for encryption)
-        val inputTemp = File.createTempFile("ftf_src_", ".tmp")
         try {
-            context.contentResolver.openInputStream(fileUri)?.use { inp ->
-                inputTemp.outputStream().use { out -> inp.copyTo(out) }
-            }
-
             val encTemp = FileTransferCrypto.encryptToTempFile(
-                source   = inputTemp,
+                source   = stagedFile,
                 keyBytes = keyBytes,
                 progress = { p -> onProgress?.invoke(p * 0.5) }
             )
@@ -373,8 +362,10 @@ object FileTransferManager {
 
     private fun resetOutgoing() {
         outgoingTransferId = null; outgoingToken = null
-        outgoingFileUri = null;    outgoingFileName = null; outgoingKeyBytes = null
+        try { outgoingStagedFile?.delete() } catch (e: Exception) {}
+        outgoingStagedFile = null; outgoingFileName = null; outgoingKeyBytes = null
     }
+
 
     private fun generateToken() =
         (0 until 32).joinToString("") { "%02x".format(SecureRandom().nextInt(256)) }

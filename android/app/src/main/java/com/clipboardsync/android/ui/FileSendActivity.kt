@@ -27,13 +27,28 @@ class FileSendActivity : AppCompatActivity() {
             val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
             if (uri != null) {
                 val fileName = getFileName(uri) ?: "shared_file"
-                Toast.makeText(this, "Sending \"$fileName\" to Mac…", Toast.LENGTH_SHORT).show()
-                FileTransferManager.sendFile(this, uri, fileName)
+                val mimeType = intent.type ?: "application/octet-stream"
+                try {
+                    val stagedFile = java.io.File(cacheDir, "outgoing_staged_${System.currentTimeMillis()}.tmp")
+                    contentResolver.openInputStream(uri)?.use { inp ->
+                        stagedFile.outputStream().use { out -> inp.copyTo(out) }
+                    }
+                    if (stagedFile.exists() && stagedFile.length() > 0) {
+                        Toast.makeText(this, "Sending \"$fileName\" to Mac…", Toast.LENGTH_SHORT).show()
+                        FileTransferManager.sendFile(this, stagedFile, fileName, mimeType)
+                    } else {
+                        Toast.makeText(this, "Unable to read file", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("FileSendActivity", "Error staging file", e)
+                    Toast.makeText(this, "Error reading file: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             } else {
                 Toast.makeText(this, "No file found to share", Toast.LENGTH_SHORT).show()
             }
         }
         finish()
+
     }
 
     private fun getFileName(uri: Uri): String? {
