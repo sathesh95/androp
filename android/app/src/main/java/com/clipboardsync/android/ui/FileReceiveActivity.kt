@@ -13,6 +13,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import com.clipboardsync.android.R
+import com.clipboardsync.android.filetransfer.FileNotificationHelper
 import com.clipboardsync.android.filetransfer.FileTransferManager
 import java.io.File
 
