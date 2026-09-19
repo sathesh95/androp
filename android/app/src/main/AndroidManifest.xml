@@ -60,6 +60,38 @@
             android:windowSoftInputMode="stateUnchanged"
             android:exported="false" />
 
+        <!-- File Receive Activity (AirDrop-like incoming transfer popup) -->
+        <activity
+            android:name=".ui.FileReceiveActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Transparent.NoAnimation"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:launchMode="singleTop" />
+
+        <!-- File Send Activity (System Share Sheet target) -->
+        <activity
+            android:name=".ui.FileSendActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Transparent.NoAnimation"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Accessibility Service: Intercepts background copy events across all apps -->
         <service
             android:name=".service.ClipboardAccessibilityService"

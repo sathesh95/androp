@@ -27,7 +27,9 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
         }
     }
     
-    private let deviceId: String = "mac-\(UUID().uuidString.prefix(8))"
+    public let publicDeviceId: String = "mac-\(UUID().uuidString.prefix(8))"
+    private var deviceId: String { publicDeviceId }
+
     private var webSocketTask: URLSessionWebSocketTask?
     private var urlSession: URLSession?
     private var pingTimer: Timer?
@@ -195,8 +197,31 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
                 print("[NetworkEngine] OTP decryption failed: \(error)")
             }
         }
+        
+        // Route file transfer signals to FileTransferManager
+        let fileSignalTypes: Set<String> = [
+            "FILE_OFFER", "FILE_ACCEPT", "FILE_REJECT",
+            "FILE_LAN_READY", "FILE_INTERNET_READY",
+            "FILE_PROGRESS", "FILE_COMPLETE", "FILE_ERROR"
+        ]
+        if fileSignalTypes.contains(type) {
+            FileTransferManager.shared.handleSignal(json)
+        }
     }
     
+    /// Broadcast a raw signal dictionary over WebSocket relay + LAN.
+    /// Used by FileTransferManager for FILE_* signals (not clipboard SYNC).
+    public func broadcastSignal(_ payload: [String: Any]) {
+        guard let jsonData   = try? JSONSerialization.data(withJSONObject: payload),
+              let jsonString = String(data: jsonData, encoding: .utf8) else { return }
+        
+        if webSocketTask?.state == .running {
+            webSocketTask?.send(.string(jsonString)) { _ in }
+        }
+        broadcastOverLan(jsonString: jsonString)
+    }
+    
+
     public func broadcastClipboard(text: String, hash: String) {
         do {
             let (ciphertext, iv, computedHash) = try CryptoEngine.shared.encrypt(plainText: text)

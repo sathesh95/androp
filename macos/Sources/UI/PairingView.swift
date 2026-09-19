@@ -3,6 +3,7 @@ import CoreImage.CIFilterBuiltins
 
 public struct PairingView: View {
     @ObservedObject private var otpManager = OTPManager.shared
+    @ObservedObject private var fileTransfer = FileTransferManager.shared
     @State private var connectionStatus: ConnectionStatus = NetworkEngine.shared.status
     @State private var pairingPayload: String = CryptoEngine.shared.getPairingPayload()
     @State private var relayUrl: String = CryptoEngine.shared.relayUrl
@@ -12,6 +13,7 @@ public struct PairingView: View {
     @State private var lastSyncedText: String = ""
     @State private var copyNotice: Bool = false
     @State private var otpCopiedNotice: Bool = false
+
 
     public init() {}
 
@@ -48,7 +50,40 @@ public struct PairingView: View {
 
             Divider()
 
-            // Quick Toggles
+            // ── Incoming File Offer Banner ──────────────────────────────
+            if let offer = fileTransfer.incomingOffer {
+                incomingOfferBanner(offer: offer)
+            }
+
+            // ── File Transfer Progress ──────────────────────────────────
+            if case .transferring = fileTransfer.state {
+                fileProgressView
+            }
+            if case .awaitingAccept = fileTransfer.state {
+                Text(fileTransfer.statusMessage)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            if case .complete = fileTransfer.state {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                    Text(fileTransfer.statusMessage).font(.system(size: 11))
+                }
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                        fileTransfer.state = .idle
+                    }
+                }
+            }
+            if case .failed(let msg) = fileTransfer.state {
+                HStack(spacing: 4) {
+                    Image(systemName: "xmark.circle.fill").foregroundColor(.red)
+                    Text(msg).font(.system(size: 11)).foregroundColor(.red).lineLimit(2)
+                }
+            }
+
+            // ── Quick Toggles ───────────────────────────────────────────
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Launch at Login (Auto-Start)", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { newValue in
@@ -76,8 +111,19 @@ public struct PairingView: View {
                 }
             }
 
-            // Footer Quit
+            // Footer
             HStack {
+                // ── Send File button ───────────────────────────────────
+                Button {
+                    FileTransferManager.shared.promptAndSendFile()
+                } label: {
+                    Label("Send File", systemImage: "arrow.up.doc")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
+                .disabled(connectionStatus == .disconnected)
+
                 Spacer()
                 Button("Quit") {
                     NSApplication.shared.terminate(nil)
@@ -92,6 +138,7 @@ public struct PairingView: View {
             self.connectionStatus = NetworkEngine.shared.status
             self.pairingPayload = CryptoEngine.shared.getPairingPayload()
         }
+
     }
 
     private var qrCodeSection: some View {
@@ -261,5 +308,70 @@ public struct PairingView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.yellow.opacity(0.35), lineWidth: 1)
         )
+    }
+
+    // MARK: - File Transfer Helper Views
+
+    @ViewBuilder
+    private func incomingOfferBanner(offer: FileTransferOffer) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down.doc.fill")
+                    .foregroundColor(.blue)
+                Text("Incoming File")
+                    .font(.system(size: 11, weight: .bold))
+                Spacer()
+            }
+
+            Text(offer.fileName)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+
+            Text(ByteCountFormatter.string(fromByteCount: offer.fileSize, countStyle: .file))
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
+
+            HStack(spacing: 8) {
+                Button("Decline") {
+                    FileTransferManager.shared.rejectOffer()
+                }
+                .buttonStyle(.bordered)
+                .font(.system(size: 11))
+
+                Button("Accept") {
+                    FileTransferManager.shared.acceptOffer()
+                }
+                .buttonStyle(.borderedProminent)
+                .font(.system(size: 11, weight: .semibold))
+            }
+        }
+        .padding(10)
+        .background(Color.blue.opacity(0.08))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+        )
+    }
+
+    private var fileProgressView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.system(size: 10))
+                    .foregroundColor(.accentColor)
+                Text(fileTransfer.statusMessage)
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+                Spacer()
+                Text("\(Int(fileTransfer.progress * 100))%")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            }
+            ProgressView(value: fileTransfer.progress)
+                .progressViewStyle(.linear)
+        }
+        .padding(8)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(8)
     }
 }

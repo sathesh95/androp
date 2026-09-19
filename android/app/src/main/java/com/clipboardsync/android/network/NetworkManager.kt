@@ -35,6 +35,10 @@ object NetworkManager {
         .retryOnConnectionFailure(true)
         .build()
 
+    // Stored in init() for use by FILE_* signal routing
+    var appContext: android.content.Context? = null
+        private set
+
     private var webSocket: WebSocket? = null
     private val handler = Handler(Looper.getMainLooper())
     private val networkExecutor = Executors.newCachedThreadPool()
@@ -59,12 +63,14 @@ object NetworkManager {
     var onRemoteClipboardReceived: ((String) -> Unit)? = null
 
     fun init(context: Context) {
+        appContext = context.applicationContext
         nsdManager = context.getSystemService(Context.NSD_SERVICE) as? NsdManager
         val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
         multicastLock = wifi?.createMulticastLock("ClipboardSyncMulticast")?.apply {
             setReferenceCounted(true)
         }
     }
+
 
     fun start() {
         isIntentionalClose = false
@@ -367,11 +373,47 @@ object NetworkManager {
                 handler.post {
                     onRemoteClipboardReceived?.invoke(plainText)
                 }
+                return
+            }
+
+            // Route file transfer signals to FileTransferManager
+            val fileSignalTypes = setOf(
+                "FILE_OFFER", "FILE_ACCEPT", "FILE_REJECT",
+                "FILE_LAN_READY", "FILE_INTERNET_READY",
+                "FILE_PROGRESS", "FILE_COMPLETE", "FILE_ERROR"
+            )
+            if (type in fileSignalTypes) {
+                appContext?.let { ctx ->
+                    com.clipboardsync.android.filetransfer.FileTransferManager.handleSignal(ctx, json)
+                }
+                return
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
+
+    /**
+     * Broadcast a raw JSON signal (FILE_* etc.) over WebSocket relay + LAN.
+     * Used by FileTransferManager — does NOT encrypt the payload.
+     */
+    fun broadcastSignal(payload: JSONObject) {
+        val jsonString = payload.toString()
+        val payloadBytes = (jsonString + "\n").toByteArray(Charsets.UTF_8)
+
+        webSocket?.send(jsonString)
+
+        networkExecutor.execute {
+            synchronized(lanSockets) {
+                for (socket in lanSockets) {
+                    try {
+                        socket.getOutputStream().apply { write(payloadBytes); flush() }
+                    } catch (e: Exception) { e.printStackTrace() }
+                }
+            }
+        }
+    }
+
 
     fun broadcastClipboard(text: String) {
         val encrypted = CryptoManager.encrypt(text) ?: return

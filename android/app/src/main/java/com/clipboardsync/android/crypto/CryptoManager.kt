@@ -63,6 +63,15 @@ object CryptoManager {
         return prefs.getString(KEY_AES_KEY, null)
     }
 
+    fun getRoomKeyBytes(): ByteArray? {
+        val keyBase64 = getKeyBase64() ?: return null
+        return try {
+            Base64.decode(keyBase64, Base64.DEFAULT)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun updateRelayUrl(newUrl: String) {
         val sanitized = sanitizeRelayUrl(newUrl)
         prefs.edit().putString(KEY_RELAY_URL, sanitized).apply()
