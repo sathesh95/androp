@@ -359,14 +359,10 @@ object NetworkManager {
 
                 if (ciphertext.isEmpty() || iv.isEmpty() || hash.isEmpty()) return
 
-                if (HashUtil.isHashKnown(hash)) {
-                    return
-                }
-
                 val decrypted = CryptoManager.decrypt(ciphertext, iv) ?: return
                 val (plainText, decryptedHash) = decrypted
 
-                HashUtil.markHashAsHandled(decryptedHash)
+                HashUtil.markRemoteInjected(decryptedHash)
 
                 handler.post {
                     onRemoteClipboardReceived?.invoke(plainText)
@@ -381,8 +377,6 @@ object NetworkManager {
         val encrypted = CryptoManager.encrypt(text) ?: return
         val (ciphertext, iv, hash) = encrypted
         val roomId = CryptoManager.getRoomId() ?: return
-
-        HashUtil.markHashAsHandled(hash)
 
         val json = JSONObject().apply {
             put("type", "SYNC")
@@ -426,8 +420,6 @@ object NetworkManager {
         val encrypted = CryptoManager.encrypt(payloadJson.toString()) ?: return
         val (ciphertext, iv, hash) = encrypted
         val roomId = CryptoManager.getRoomId() ?: return
-
-        HashUtil.markHashAsHandled(hash)
 
         val json = JSONObject().apply {
             put("type", "OTP")

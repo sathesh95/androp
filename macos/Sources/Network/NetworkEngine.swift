@@ -145,16 +145,11 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
         
         if type == "SYNC" || type == "LATEST_DATA" {
             guard let ciphertext = json["ciphertext"] as? String,
-                  let iv = json["iv"] as? String,
-                  let hash = json["hash"] as? String else { return }
+                  let iv = json["iv"] as? String else { return }
             
             let originDeviceId = json["originDeviceId"] as? String ?? ""
             if originDeviceId == self.deviceId {
                 // Ignore our own echo
-                return
-            }
-            
-            if ClipboardWatcher.shared.isHashKnown(hash) {
                 return
             }
             

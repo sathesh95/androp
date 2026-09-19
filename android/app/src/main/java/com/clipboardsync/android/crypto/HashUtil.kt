@@ -2,11 +2,10 @@ package com.clipboardsync.android.crypto
 
 import java.security.MessageDigest
 import java.util.Collections
-import java.util.LinkedHashSet
+import java.util.HashSet
 
 object HashUtil {
-    private val maxHistorySize = 100
-    private val knownHashes = Collections.synchronizedSet(LinkedHashSet<String>())
+    private val remoteInjectedHashes = Collections.synchronizedSet(HashSet<String>())
 
     fun sha256(input: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -14,20 +13,11 @@ object HashUtil {
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    fun markHashAsHandled(hash: String) {
-        synchronized(knownHashes) {
-            knownHashes.add(hash)
-            if (knownHashes.size > maxHistorySize) {
-                val iterator = knownHashes.iterator()
-                if (iterator.hasNext()) {
-                    iterator.next()
-                    iterator.remove()
-                }
-            }
-        }
+    fun markRemoteInjected(hash: String) {
+        remoteInjectedHashes.add(hash)
     }
 
-    fun isHashKnown(hash: String): Boolean {
-        return knownHashes.contains(hash)
+    fun consumeRemoteInjectedIfPresent(hash: String): Boolean {
+        return remoteInjectedHashes.remove(hash)
     }
 }

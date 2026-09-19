@@ -122,8 +122,7 @@ class ClipboardGhostActivity : Activity() {
                 val text = item.text?.toString() ?: item.coerceToText(this).toString()
                 if (text.isNotEmpty()) {
                     val hash = HashUtil.sha256(text)
-                    if (!HashUtil.isHashKnown(hash)) {
-                        HashUtil.markHashAsHandled(hash)
+                    if (!HashUtil.consumeRemoteInjectedIfPresent(hash)) {
                         Log.d(TAG, "Successfully read clipboard: ${text.take(30)}... Broadcasting to Mac!")
                         NetworkManager.broadcastClipboard(text)
                     }
@@ -140,7 +139,7 @@ class ClipboardGhostActivity : Activity() {
         try {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
             val hash = HashUtil.sha256(text)
-            HashUtil.markHashAsHandled(hash)
+            HashUtil.markRemoteInjected(hash)
             clipboard?.setPrimaryClip(ClipData.newPlainText("ClipboardSync", text))
             Log.d(TAG, "Successfully wrote to Android clipboard via ghost activity")
         } catch (e: Exception) {
