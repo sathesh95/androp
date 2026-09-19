@@ -75,37 +75,33 @@ class ClipboardAccessibilityService : AccessibilityService() {
                     }
                 }
 
-                // Strategy 2: Clicks and Window State Changes
-                AccessibilityEvent.TYPE_VIEW_CLICKED,
-                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                // Strategy 2: Clicks on Copy Buttons / Menu Items
+                AccessibilityEvent.TYPE_VIEW_CLICKED -> {
                     val contentDesc = event.contentDescription?.toString() ?: ""
                     val eventText = event.text.joinToString(" ")
-                    val isClick = event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED
+                    val source = event.source
                     var triggerType: String? = null
 
-                    // Action ID check: ACTION_COPY is language independent
-                    val source = event.source
-                    if (isClick && source?.actionList?.any { it.id == AccessibilityNodeInfo.ACTION_COPY } == true) {
-                        triggerType = "ACTION_COPY"
+                    // Never treat clicking an editable text field as clicking a "Copy" button!
+                    val isEditable = source?.isEditable == true
+                    if (!isEditable && source?.actionList?.any { it.id == AccessibilityNodeInfo.ACTION_COPY } == true) {
+                        triggerType = "ACTION_COPY (Button)"
                     }
 
-                    // Word heuristics check
-                    if (triggerType == null) {
+                    // Word heuristics check (e.g. text or contentDescription contains "Copy")
+                    if (triggerType == null && !isEditable) {
                         val hasCopy = containsCopyWord(contentDesc) || containsCopyWord(eventText)
-                        val hasCopied = containsCopiedWord(contentDesc) || containsCopiedWord(eventText)
-                        if (isClick && hasCopy) triggerType = "Click (Copy Button)"
-                        else if (hasCopied) triggerType = "Passive (Copied)"
+                        if (hasCopy) triggerType = "Click (Copy Word)"
                     }
 
-                    // Deep Node Search as fallback
-                    if (triggerType == null && source != null) {
+                    // Deep Node Search as fallback (only for non-editable clicks)
+                    if (triggerType == null && source != null && !isEditable) {
                         backgroundExecutor.execute {
                             try {
-                                if (dfsFindCopy(source, isClick = isClick)) {
-                                    val finalType = if (isClick) "Deep Search (Click)" else "Deep Search (Window)"
+                                if (dfsFindCopy(source, depth = 0, isClick = true)) {
                                     handler.post {
                                         lastEventTime = eventTime
-                                        triggerClipboardGhost(finalType)
+                                        triggerClipboardGhost("Deep Search (Click)")
                                     }
                                 }
                             } finally {
@@ -126,6 +122,21 @@ class ClipboardAccessibilityService : AccessibilityService() {
                         }
                     }
                 }
+
+                // Strategy 3: Window State Changed — only look for explicit "Copied" toast/floating popup text
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                    val contentDesc = event.contentDescription?.toString() ?: ""
+                    val eventText = event.text.joinToString(" ")
+                    if (containsCopiedWord(contentDesc) || containsCopiedWord(eventText)) {
+                        lastEventTime = eventTime
+                        triggerClipboardGhost("Passive (Copied in Window)")
+                    }
+                    if (Build.VERSION.SDK_INT < 34) {
+                        @Suppress("DEPRECATION")
+                        event.source?.recycle()
+                    }
+                }
+
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in onAccessibilityEvent", e)
@@ -148,8 +159,8 @@ class ClipboardAccessibilityService : AccessibilityService() {
         val viewId = node.viewIdResourceName ?: ""
 
         val combined = "$text $contentDesc $viewId".trim()
-        if (node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_COPY }) return true
-        if (isClick && containsCopyWord(combined)) return true
+        if (!node.isEditable && node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_COPY }) return true
+        if (isClick && !node.isEditable && containsCopyWord(combined)) return true
         if (!isClick && (containsCopiedWord(combined) || viewId.contains("copy", ignoreCase = true))) return true
 
         for (i in 0 until node.childCount) {

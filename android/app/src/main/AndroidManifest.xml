@@ -64,10 +64,12 @@
         <activity
             android:name=".ui.FileReceiveActivity"
             android:exported="false"
-            android:theme="@style/Theme.Transparent.NoAnimation"
+            android:theme="@style/Theme.FileReceive"
+            android:taskAffinity="com.clipboardsync.android.filetransfer"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:launchMode="singleTop" />
+
 
         <!-- File Send Activity (System Share Sheet target) -->
         <activity
