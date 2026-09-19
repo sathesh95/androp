@@ -247,10 +247,9 @@ object FileTransferManager {
         } catch (e: Exception) {
             Log.e(TAG, "Upload error", e)
             signalError(context, e.message ?: "Upload failed")
-        } finally {
-            inputTemp.delete()
         }
     }
+
 
     // ── Receiver: FILE_LAN_READY ─────────────────────────────────────────────
 
