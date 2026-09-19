@@ -205,6 +205,7 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
             "FILE_PROGRESS", "FILE_COMPLETE", "FILE_ERROR"
         ]
         if fileSignalTypes.contains(type) {
+            print("[NetworkEngine] Routing incoming file signal: \(type)")
             FileTransferManager.shared.handleSignal(json)
         }
     }
@@ -215,8 +216,15 @@ public final class NetworkEngine: NSObject, URLSessionWebSocketDelegate {
         guard let jsonData   = try? JSONSerialization.data(withJSONObject: payload),
               let jsonString = String(data: jsonData, encoding: .utf8) else { return }
         
+        let type = payload["type"] as? String ?? ""
+        print("[NetworkEngine] Broadcasting signal '\(type)' (WebSocket running=\(webSocketTask?.state == .running), LAN connections=\(activeLanConnections.count))")
+
         if webSocketTask?.state == .running {
-            webSocketTask?.send(.string(jsonString)) { _ in }
+            webSocketTask?.send(.string(jsonString)) { error in
+                if let error = error {
+                    print("[NetworkEngine] WebSocket send signal error: \(error)")
+                }
+            }
         }
         broadcastOverLan(jsonString: jsonString)
     }

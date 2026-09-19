@@ -48,6 +48,8 @@ class FileReceiveActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_file_receive)
 
+        FileNotificationHelper.dismissNotification(this)
+
         tvTitle     = findViewById(R.id.tv_title)
         tvFileName  = findViewById(R.id.tv_file_name)
         tvFileSize  = findViewById(R.id.tv_file_size)

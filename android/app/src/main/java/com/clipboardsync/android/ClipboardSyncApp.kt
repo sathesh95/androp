@@ -10,6 +10,7 @@ class ClipboardSyncApp : Application() {
 
     companion object {
         const val CHANNEL_ID = "clipboard_sync_channel"
+        const val FILE_CHANNEL_ID = "file_transfer_channel"
     }
 
     override fun onCreate() {
@@ -21,7 +22,7 @@ class ClipboardSyncApp : Application() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
+            val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
                 "Clipboard Sync Service",
                 NotificationManager.IMPORTANCE_LOW
@@ -29,8 +30,20 @@ class ClipboardSyncApp : Application() {
                 description = "Keeps clipboard synchronization active in the background"
                 setShowBadge(false)
             }
+
+            val fileChannel = NotificationChannel(
+                FILE_CHANNEL_ID,
+                "File Transfers",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifies when an incoming file transfer arrives from Mac"
+                enableVibration(true)
+                setShowBadge(true)
+            }
+
             val manager = getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(channel)
+            manager?.createNotificationChannel(serviceChannel)
+            manager?.createNotificationChannel(fileChannel)
         }
     }
 }

@@ -132,16 +132,31 @@ object FileTransferManager {
         incomingKeyBytes   = fileKey
         incomingFileName   = fileName
 
-        // Launch full-screen accept/reject activity (like AirDrop)
-        val intent = Intent(context, FileReceiveActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            putExtra("transferId",   transferId)
-            putExtra("fileName",     fileName)
-            putExtra("fileSize",     fileSize)
-            putExtra("mimeType",     mimeType)
-            putExtra("originDevice", originDevice)
+        Log.d(TAG, "Incoming file offer: $fileName ($fileSize bytes) from $originDevice")
+
+        // 1. Show High-Priority Heads-Up Notification (reliable on Android 10+ background)
+        FileNotificationHelper.showIncomingFileNotification(
+            context = context,
+            transferId = transferId,
+            fileName = fileName,
+            fileSize = fileSize,
+            originDevice = originDevice
+        )
+
+        // 2. Also try starting activity directly (succeeds if app is foreground or has overlay perms)
+        try {
+            val intent = Intent(context, FileReceiveActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra("transferId",   transferId)
+                putExtra("fileName",     fileName)
+                putExtra("fileSize",     fileSize)
+                putExtra("mimeType",     mimeType)
+                putExtra("originDevice", originDevice)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Log.d(TAG, "Direct activity start suppressed by OS (notification will handle it): ${e.message}")
         }
-        context.startActivity(intent)
     }
 
     fun acceptOffer(context: Context) {

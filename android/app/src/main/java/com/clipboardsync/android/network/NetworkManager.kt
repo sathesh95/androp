@@ -383,13 +383,17 @@ object NetworkManager {
                 "FILE_PROGRESS", "FILE_COMPLETE", "FILE_ERROR"
             )
             if (type in fileSignalTypes) {
-                appContext?.let { ctx ->
+                android.util.Log.d("NetworkManager", "Handling file transfer signal: $type")
+                val ctx = appContext
+                if (ctx != null) {
                     com.clipboardsync.android.filetransfer.FileTransferManager.handleSignal(ctx, json)
+                } else {
+                    android.util.Log.e("NetworkManager", "Cannot route file signal $type: appContext is null!")
                 }
                 return
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("NetworkManager", "Error handling incoming message: ${e.message}", e)
         }
     }
 
