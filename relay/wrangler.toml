@@ -7,6 +7,10 @@ bindings = [
   { name = "SYNC_ROOMS", class_name = "SyncRoom" }
 ]
 
+[[r2_buckets]]
+binding = "FILE_BUCKET"
+bucket_name = "clipboard-sync-files"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["SyncRoom"]
